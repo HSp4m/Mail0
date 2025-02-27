@@ -7,17 +7,25 @@ import { navigationConfig } from "@/config/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { useSidebar } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSession } from "@/lib/auth-client";
 import React, { useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
+import { EnableBrain } from "@/actions/brain";
 import { mailCount } from "@/actions/mail";
+import { Brain } from "lucide-react";
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 import { Button } from "./button";
 import Image from "next/image";
+import { toast } from "sonner";
 import useSWR from "swr";
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { data: stats } = useSWR<number[]>("mail-count", mailCount);
+  const { data: session } = useSession();
+  const { data: stats } = useSWR<{ folder: string; count: number }[]>(
+    session?.connectionId ? `/mail-count/${session?.connectionId}` : null,
+    mailCount,
+  );
 
   const pathname = usePathname();
 
@@ -28,18 +36,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     );
 
     const currentSection = section?.[0] || "mail";
-    const items = [...navigationConfig[currentSection].sections];
+    if (navigationConfig[currentSection]) {
+      const items = [...navigationConfig[currentSection].sections];
 
-    if (currentSection === "mail" && stats) {
-      if (items[0]?.items[0]) {
-        items[0].items[0].badge = stats[0] ?? 0;
+      if (currentSection === "mail" && stats) {
+        if (items[0]?.items[0]) {
+          items[0].items[0].badge = stats.find((stat) => stat.folder === "INBOX")?.count ?? 0;
+        }
+        if (items[0]?.items[3]) {
+          items[0].items[3].badge = stats.find((stat) => stat.folder === "SENT")?.count ?? 0;
+        }
       }
-      if (items[0]?.items[3]) {
-        items[0].items[3].badge = stats[1] ?? 0;
-      }
+
+      return { currentSection, navItems: items };
+    } else {
+      return {
+        currentSection: "",
+        navItems: [],
+      };
     }
-
-    return { currentSection, navItems: items };
   }, [pathname, stats]);
 
   const showComposeButton = currentSection === "mail";
@@ -61,6 +76,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               </motion.div>
             )}
           </AnimatePresence>
+          <Button
+            onClick={async () => {
+              toast.promise(EnableBrain(), {
+                loading: "Enabling brain... takes around 8 seconds...",
+                success: "Enabled successfully!",
+                error: "Enable brain failed",
+              });
+            }}
+            className="bg-secondary bg-subtleWhite text-primary hover:bg-subtleWhite dark:bg-subtleBlack dark:hover:bg-subtleBlack relative isolate h-8 w-[calc(100%)] overflow-hidden whitespace-nowrap shadow-inner"
+          >
+            <Brain />
+          </Button>
         </SidebarHeader>
         <SidebarContent className="py-0 pt-0">
           <AnimatePresence mode="wait">
@@ -77,7 +104,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </AnimatePresence>
         </SidebarContent>
       </div>
-
       <div className="mb-4 ml-1 mt-auto pl-1.5">
         <Image
           src="/black-icon.svg"
@@ -107,7 +133,7 @@ function ComposeButton() {
   return (
     <Button
       onClick={open}
-      className="relative isolate mt-1 h-8 w-[calc(100%)] overflow-hidden whitespace-nowrap bg-secondary bg-subtleWhite text-primary shadow-inner hover:bg-subtleWhite dark:bg-subtleBlack dark:hover:bg-subtleBlack"
+      className="bg-secondary bg-subtleWhite text-primary hover:bg-subtleWhite dark:bg-subtleBlack dark:hover:bg-subtleBlack relative isolate mt-1 h-8 w-[calc(100%)] overflow-hidden whitespace-nowrap shadow-inner"
       onMouseEnter={() => () => iconRef.current?.startAnimation?.()}
       onMouseLeave={() => () => iconRef.current?.stopAnimation?.()}
     >

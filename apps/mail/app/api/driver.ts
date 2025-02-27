@@ -110,12 +110,12 @@ const googleDriver = async (config: IConfig): Promise<MailManager> => {
       references,
       inReplyTo,
       sender: {
-        name: name.replace(/"/g, "").trim(),
+        name: name ? name.replace(/"/g, "").trim() : 'Unknown',
         email: `<${email}`,
       },
       unread: labelIds ? labelIds.includes("UNREAD") : false,
       receivedOn,
-      subject,
+      subject: subject ? subject.replace(/"/g, "").trim() : 'No subject',
       messageId,
     };
   };
@@ -167,14 +167,17 @@ const googleDriver = async (config: IConfig): Promise<MailManager> => {
       return await Promise.all(
         folders.map(async (folder) => {
           const { folder: normalizedFolder, q: normalizedQ } = normalizeSearch(folder, "");
-          const labelIds = [];
+          const labelIds = ["UNREAD"];
           if (normalizedFolder) labelIds.push(normalizedFolder.toUpperCase());
           const res = await gmail.users.threads.list({
             userId: "me",
             q: normalizedQ ? normalizedQ : undefined,
             labelIds,
           });
-          return res.data.resultSizeEstimate;
+          return {
+            folder: normalizedFolder,
+            count: res.data.resultSizeEstimate,
+          };
         }),
       );
     },
